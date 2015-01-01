@@ -26,12 +26,15 @@
 #include <xkbcommon/xkbcommon-x11.h>
 #include <cairo.h>
 #include <cairo/cairo-xcb.h>
+#include <librsvg/rsvg.h>
 
 #include "i3lock.h"
 #include "xcb.h"
 #include "cursors.h"
 #include "unlock_indicator.h"
 #include "xinerama.h"
+
+#include "button.h"
 
 #define TSTAMP_N_SECS(n) (n * 1.0)
 #define TSTAMP_N_MINS(n) (60 * TSTAMP_N_SECS(n))
@@ -64,8 +67,6 @@ static struct ev_timer *dpms_timeout;
 static struct ev_timer *discard_passwd_timeout;
 extern unlock_state_t unlock_state;
 extern pam_state_t pam_state;
-int failed_attempts = 0;
-bool show_failed_attempts = false;
 
 static struct xkb_state *xkb_state;
 static struct xkb_context *xkb_context;
@@ -74,6 +75,10 @@ static uint8_t xkb_base_event;
 static uint8_t xkb_base_error;
 
 cairo_surface_t *img = NULL;
+RsvgHandle *svg = NULL;
+int anim_layer_count = 0;
+bool remove_background = false;
+bool sequential_animation = false;
 bool tile = false;
 bool ignore_empty_password = false;
 bool skip_repeated_empty_password = false;
@@ -241,7 +246,6 @@ static void input_done(void) {
         fprintf(stderr, "Authentication failure\n");
 
     pam_state = STATE_PAM_WRONG;
-    failed_attempts += 1;
     clear_input();
     redraw_screen();
 
@@ -661,6 +665,7 @@ static void raise_loop(xcb_window_t window) {
 int main(int argc, char *argv[]) {
     char *username;
     char *image_path = NULL;
+    char *svg_path = NULL;
     int ret;
     struct pam_conv conv = {conv_callback, NULL};
     int curs_choice = CURS_NONE;
@@ -680,14 +685,14 @@ int main(int argc, char *argv[]) {
         {"tiling", no_argument, NULL, 't'},
         {"ignore-empty-password", no_argument, NULL, 'e'},
         {"inactivity-timeout", required_argument, NULL, 'I'},
-        {"show-failed-attempts", no_argument, NULL, 'f'},
+        {"indicator-svg", required_argument, NULL, 's'},
         {NULL, no_argument, NULL, 0}
     };
 
     if ((username = getenv("USER")) == NULL)
         errx(EXIT_FAILURE, "USER environment variable not set, please set it.\n");
 
-    char *optstring = "hvnbdc:p:ui:teI:f";
+    char *optstring = "hvnbdc:p:ui:teI:s:";
     while ((o = getopt_long(argc, argv, optstring, longopts, &optind)) != -1) {
         switch (o) {
         case 'v':
@@ -745,12 +750,12 @@ int main(int argc, char *argv[]) {
             if (strcmp(longopts[optind].name, "debug") == 0)
                 debug_mode = true;
             break;
-        case 'f':
-            show_failed_attempts = true;
+        case 's':
+            svg_path = strdup(optarg);
             break;
         default:
             errx(EXIT_FAILURE, "Syntax: i3lock [-v] [-n] [-b] [-d] [-c color] [-u] [-p win|default]"
-            " [-i image.png] [-t] [-e] [-I] [-f]"
+            " [-i image.png] [-t] [-e] [-I] [-f] [-s]"
             );
         }
     }
@@ -853,6 +858,35 @@ int main(int argc, char *argv[]) {
                     image_path, cairo_status_to_string(cairo_surface_status(img)));
             img = NULL;
         }
+    }
+
+    /* Load SVG */
+    GError* e = NULL;
+    if (svg_path == NULL) {
+        svg = rsvg_handle_new_from_data(button_svg, sizeof(button_svg), &e);
+    } else {
+       svg = rsvg_handle_new_from_file(svg_path, &e);
+    }
+
+    if(e != NULL) {
+        errx(EXIT_FAILURE, "Could not load indicator SVG: %s", e->message);
+    }
+
+    for(;anim_layer_count < 100; anim_layer_count++) {
+        char anim_id[9];
+        snprintf(anim_id, sizeof(anim_id), "#anim%02d", anim_layer_count);
+
+        if(rsvg_handle_has_sub(svg, anim_id) != TRUE) {
+            break;
+        }
+    }
+
+    if(rsvg_handle_has_sub(svg, "#remove_background") == TRUE) {
+        remove_background = true;
+    }
+
+    if(rsvg_handle_has_sub(svg, "#sequential_animation") == TRUE) {
+        sequential_animation = true;
     }
 
     /* Pixmap on which the image is rendered to (if any) */

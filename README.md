@@ -31,11 +31,29 @@ Requirements
 - libxkbfile-dev
 - libxkbcommon >= 0.4.0
 - libxkbcommon-x11 >= 0.4.0
+- librsvg
 
 Running i3lock
 -------------
 Simply invoke the 'i3lock' command. To get out of it, enter your password and
 press enter.
+
+Creating indicator SVGs
+-----------------------
+In each state a specific object id will be rendered. Used ids are:
+- "idle"
+- "verify"
+- "fail"
+- "backspace"
+- "animXX" for frames of the typing animation, where XX is a ascending number
+  starting at "00".
+- "fg" and "bg" for foreground and background
+
+If the id "sequential_animation" is present, animation frames will be rendered
+in ascending order instead of random order.
+
+If the id "remove_background" is present "idle", "verfiy" and "fail" won't be
+rendered when drawing the animation frames.
 
 Upstream
 --------
