@@ -1,7 +1,7 @@
 /*
  * vim:ts=4:sw=4:expandtab
  *
- * © 2010-2014 Michael Stapelberg
+ * © 2010 Michael Stapelberg
  *
  * See LICENSE for licensing information
  *
@@ -9,6 +9,7 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include <math.h>
 #include <xcb/xcb.h>
 #include <ev.h>
@@ -39,6 +40,9 @@ extern uint32_t last_resolution[2];
 
 /* Whether the unlock indicator is enabled (defaults to true). */
 extern bool unlock_indicator;
+
+/* List of pressed modifiers, or NULL if none are pressed. */
+extern char *modifier_string;
 
 /* A Cairo surface containing the specified image (-i), if any. */
 extern cairo_surface_t *img;
@@ -226,7 +230,7 @@ xcb_pixmap_t draw_image(uint32_t *resolution) {
  */
 void redraw_screen(void) {
     xcb_pixmap_t bg_pixmap = draw_image(last_resolution);
-    xcb_change_window_attributes(conn, win, XCB_CW_BACK_PIXMAP, (uint32_t[1]){ bg_pixmap });
+    xcb_change_window_attributes(conn, win, XCB_CW_BACK_PIXMAP, (uint32_t[1]){bg_pixmap});
     /* XXX: Possible optimization: Only update the area in the middle of the
      * screen instead of the whole screen. */
     xcb_clear_area(conn, 0, win, 0, 0, last_resolution[0], last_resolution[1]);
@@ -242,6 +246,7 @@ void redraw_screen(void) {
 void clear_indicator(void) {
     if (input_position == 0) {
         unlock_state = STATE_STARTED;
-    } else unlock_state = STATE_KEY_PRESSED;
+    } else
+        unlock_state = STATE_KEY_PRESSED;
     redraw_screen();
 }
