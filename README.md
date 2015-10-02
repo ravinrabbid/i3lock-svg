@@ -55,6 +55,23 @@ in ascending order instead of random order.
 If the id "remove_background" is present "idle", "verfiy" and "fail" won't be
 rendered when drawing the animation frames.
 
+For easier testing, uncomment lines:
+```
+        case XKB_KEY_Escape:
+            clear_password_memory();
+            turn_monitors_on();
+            exit(0);
+```
+
+Use caution, as this will disable all password checking and immediately
+terminate i3lock when the Esc is pressed.
+
+Running: Use -i for the background image, and -s for the svg, for
+example:
+
+./i3lock -i examples/1920x1080-wasatchphotonics.png \
+         -s examples/wasatch_photonics_prism.svg 
+
 Upstream
 --------
 Please submit pull requests to https://github.com/i3/i3lock
